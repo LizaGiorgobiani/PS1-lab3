@@ -19,8 +19,16 @@ import { Flashcard, AnswerDifficulty, BucketMap } from "./flashcards";
  * @spec.requires buckets is a valid representation of flashcard buckets.
  */
 export function toBucketSets(buckets: BucketMap): Array<Set<Flashcard>> {
-  // TODO: Implement this function
-  throw new Error("Implement me!");
+  const maxBucket = Math.max(...Array.from(buckets.keys()));
+  const totalBuckets = maxBucket + 1;
+  const result: Array<Set<Flashcard>> = Array.from(
+    { length: totalBuckets },
+    () => new Set()
+  );
+  for (let i = 0; i < totalBuckets; i++) {
+    result[i] = buckets.get(i) || new Set();
+  }
+  return result;
 }
 
 /**
@@ -35,7 +43,19 @@ export function getBucketRange(
   buckets: Array<Set<Flashcard>>
 ): { minBucket: number; maxBucket: number } | undefined {
   // TODO: Implement this function
-  throw new Error("Implement me!");
+  const nonEmptyBuckets = buckets
+    .map((set, index) => ({ index, size: set.size }))
+    .filter((item) => item.size > 0)
+    .map((item) => item.index);
+
+  if (nonEmptyBuckets.length === 0) {
+    return undefined;
+  }
+
+  return {
+    minBucket: Math.min(...nonEmptyBuckets),
+    maxBucket: Math.max(...nonEmptyBuckets),
+  };
 }
 
 /**
@@ -51,8 +71,16 @@ export function practice(
   buckets: Array<Set<Flashcard>>,
   day: number
 ): Set<Flashcard> {
-  // TODO: Implement this function
-  throw new Error("Implement me!");
+  const practiceSet = new Set<Flashcard>();
+  for (let i = 0; i < buckets.length; i++) {
+    const bucket = buckets[i];
+    if (bucket && day % 2 ** i === 0) {
+      for (const card of bucket) {
+        practiceSet.add(card);
+      }
+    }
+  }
+  return practiceSet;
 }
 
 /**
@@ -69,8 +97,34 @@ export function update(
   card: Flashcard,
   difficulty: AnswerDifficulty
 ): BucketMap {
-  // TODO: Implement this function
-  throw new Error("Implement me!");
+  const currentBucket =
+    [...buckets.entries()].find(([_, cards]) => cards.has(card))?.[0] ?? 0;
+
+  // Remove the card from the current bucket
+  if (buckets.get(currentBucket)) {
+    buckets.get(currentBucket)?.delete(card);
+  }
+
+  let newBucket = currentBucket;
+  switch (difficulty) {
+    case AnswerDifficulty.Easy:
+      newBucket += 1;
+      break;
+    case AnswerDifficulty.Hard:
+      if (currentBucket > 0) newBucket -= 1;
+      break;
+    case AnswerDifficulty.Wrong:
+      newBucket = 0;
+      break;
+  }
+
+  if (!buckets.has(newBucket)) {
+    buckets.set(newBucket, new Set());
+  }
+
+  buckets.get(newBucket)?.add(card);
+
+  return buckets;
 }
 
 /**
@@ -80,9 +134,19 @@ export function update(
  * @returns a hint for the front of the flashcard.
  * @spec.requires card is a valid Flashcard.
  */
-export function getHint(card: Flashcard): string {
-  // TODO: Implement this function (and strengthen the spec!)
-  throw new Error("Implement me!");
+export function getHint(
+  card: Flashcard,
+  revealPercentage: number = 30
+): string {
+  if (revealPercentage <= 0 || revealPercentage > 100) {
+    throw new Error("revealPercentage must be between 1 and 100");
+  }
+  const text = card.front;
+  if (text.includes(" ")) {
+    return text.split(" ")[0] + "...";
+  }
+  const revealCount = Math.ceil((revealPercentage / 100) * text.length);
+  return text.slice(0, revealCount) + "...";
 }
 
 /**
@@ -93,8 +157,25 @@ export function getHint(card: Flashcard): string {
  * @returns statistics about learning progress.
  * @spec.requires [SPEC TO BE DEFINED]
  */
-export function computeProgress(buckets: any, history: any): any {
-  // Replace 'any' with appropriate types
-  // TODO: Implement this function (and define the spec!)
-  throw new Error("Implement me!");
+
+/*
+computes the percentage of the cards which are correct 
+ */
+export function computeProgress(buckets: BucketMap): string {
+  if (buckets.size === 0) {
+    return "0.00%";
+  }
+  const totalCards = Array.from(buckets.values()).reduce(
+    (sum, cards) => sum + cards.size,
+    0
+  );
+
+  if (totalCards === 0) {
+    return "0.00%";
+  }
+
+  const retiredCards = buckets.get(5)?.size || 0;
+  const progressPercentage = (retiredCards / totalCards) * 100;
+
+  return progressPercentage.toFixed(2) + "%";
 }
